@@ -421,8 +421,11 @@ function drawChargeRings(width, height, sceneParameters) {
   outputContext.lineWidth = Math.max(2, scale * 0.004);
 
   for (let index = 0; index < 3; index += 1) {
-    const pulse = (Math.sin(showRuntime.sceneTime * 3 - index) + 1) * 0.018;
-    const radius = scale * (0.12 + index * 0.075 + pulse);
+    const pulse = (Math.sin(showRuntime.sceneTime * 3 - index) + 1) *
+      0.012 * sceneParameters.particleRate;
+    const radius = scale * (
+      0.08 + sceneParameters.particleRate * 0.18 + index * 0.075 + pulse
+    );
     outputContext.beginPath();
     outputContext.arc(x, y, radius, 0, Math.PI * 2);
     outputContext.stroke();
@@ -443,9 +446,14 @@ function drawVortexArcs(width, height, sceneParameters) {
 
   for (let index = 0; index < 5; index += 1) {
     const radius = scale * (0.1 + index * 0.07);
-    const start = showRuntime.sceneTime * (0.7 + index * 0.08) + index;
+    const angularSpeed = sceneParameters.particleRate * 2.6;
+    const start = showRuntime.sceneTime * angularSpeed *
+      (1 + index * 0.08) + index;
+    const arcLength = Math.PI * (
+      0.32 + sceneParameters.particleRate * 1.05 + index * 0.05
+    );
     outputContext.beginPath();
-    outputContext.arc(x, y, radius, start, start + Math.PI * (0.65 + index * 0.08));
+    outputContext.arc(x, y, radius, start, start + arcLength);
     outputContext.stroke();
   }
 

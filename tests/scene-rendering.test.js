@@ -139,8 +139,63 @@ test("粒子は場面を保持せず、Canvasの高負荷効果を使わない",
   assert.doesNotMatch(appSource, /\bmode\s*:/);
 });
 
+test("CHARGEは入力強度に応じてリング径を大きく変える", () => {
+  const weakArcs = captureSceneArcs("drawChargeRings", {
+    hue: 25,
+    intensity: 0.35,
+    particleRate: 0.4,
+  });
+  const strongArcs = captureSceneArcs("drawChargeRings", {
+    hue: 25,
+    intensity: 0.85,
+    particleRate: 0.95,
+  });
+
+  assert.ok(strongArcs[0].radius - weakArcs[0].radius >= 70);
+});
+
+test("VORTEXは入力強度に応じて円弧の長さと角速度を変える", () => {
+  const weakArcs = captureSceneArcs("drawVortexArcs", {
+    hue: 280,
+    intensity: 0.4,
+    particleRate: 0.4,
+  });
+  const strongArcs = captureSceneArcs("drawVortexArcs", {
+    hue: 280,
+    intensity: 0.9,
+    particleRate: 0.95,
+  });
+  const weakLength = weakArcs[0].end - weakArcs[0].start;
+  const strongLength = strongArcs[0].end - strongArcs[0].start;
+
+  assert.ok(strongLength - weakLength >= 1.5);
+  assert.ok(strongArcs[0].start - weakArcs[0].start >= 2.5);
+});
+
 function loadFunction(name, sandbox) {
   return vm.runInNewContext(`(${extractFunction(name)})`, sandbox);
+}
+
+function captureSceneArcs(name, sceneParameters) {
+  const arcs = [];
+  const outputContext = {
+    beginPath() {},
+    restore() {},
+    save() {},
+    stroke() {},
+    arc(x, y, radius, start, end) {
+      arcs.push({ x, y, radius, start, end });
+    },
+  };
+  const sandbox = {
+    Math,
+    getSceneCenter() { return { x: 640, y: 360 }; },
+    outputContext,
+    showRuntime: { sceneTime: 2 },
+  };
+
+  loadFunction(name, sandbox)(1280, 720, sceneParameters);
+  return arcs;
 }
 
 function extractFunction(name) {

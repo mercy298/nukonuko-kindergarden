@@ -68,8 +68,40 @@ test("静止中は静止ゲージが増え、動くと減る", () => {
   const still = repeatUpdate(start, { ...SIGNAL, motion: 0.02 }, 0.1, 10);
   const moved = updateShowRuntime(still, SIGNAL, 0.25);
 
-  assert.ok(Math.abs(still.stillness - 0.5) < 0.0001);
-  assert.ok(Math.abs(moved.stillness - 0.25) < 0.0001);
+  assert.ok(Math.abs(still.stillness - 0.65) < 0.0001);
+  assert.ok(Math.abs(moved.stillness - 0.35) < 0.0001);
+});
+
+test("実測motion帯を場面内の明確な強度差へ増幅する", () => {
+  const weakSignal = { ...SIGNAL, motion: 0.07 };
+  const strongSignal = { ...SIGNAL, motion: 0.3 };
+  const noMotionSignal = { ...SIGNAL, motion: 0 };
+
+  for (const phase of [SHOW_PHASE.CHARGE, SHOW_PHASE.VORTEX]) {
+    const state = selectShowPhase(createShowRuntime(), phase);
+    const weak = deriveSceneParameters(state, weakSignal);
+    const strong = deriveSceneParameters(state, strongSignal);
+    const calm = deriveSceneParameters(state, noMotionSignal);
+
+    assert.ok(weak.particleRate >= 0.35, `${phase}の弱い入力も視認可能にする`);
+    assert.ok(
+      strong.particleRate - weak.particleRate >= 0.5,
+      `${phase}の実測範囲に明確な粒子量差を作る`,
+    );
+    assert.equal(calm.particleRate, 0, `${phase}の無変化時は粒子を発生しない`);
+  }
+});
+
+test("FREEZEは実測上の静止から1.5秒で大きく収束する", () => {
+  const start = selectShowPhase(createShowRuntime(), SHOW_PHASE.FREEZE);
+  const frozen = repeatUpdate(
+    start,
+    { ...SIGNAL, motion: 0.07 },
+    0.1,
+    15,
+  );
+
+  assert.ok(frozen.stillness >= 0.9);
 });
 
 test("全場面の描画パラメーターが有限の範囲内に収まる", () => {

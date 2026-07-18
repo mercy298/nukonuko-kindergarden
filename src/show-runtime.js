@@ -48,7 +48,7 @@ export function updateShowRuntime(state, signal, deltaSeconds) {
   } else if (state.phase === SHOW_PHASE.VORTEX) {
     energy = clamp01(energy + motion * 0.25 * elapsed);
   } else if (state.phase === SHOW_PHASE.FREEZE) {
-    const stillnessRate = motion < 0.08 ? 0.5 : -1;
+    const stillnessRate = motion < 0.1 ? 0.65 : -1.2;
     stillness = clamp01(stillness + stillnessRate * elapsed);
   }
 
@@ -62,6 +62,7 @@ export function updateShowRuntime(state, signal, deltaSeconds) {
 
 export function deriveSceneParameters(state, signal) {
   const motion = clamp01(signal.motion);
+  const amplifiedMotion = amplifyMotion(motion);
   const energy = clamp01(state.energy);
   const stillness = clamp01(state.stillness);
   let parameters;
@@ -69,9 +70,9 @@ export function deriveSceneParameters(state, signal) {
   switch (state.phase) {
     case SHOW_PHASE.CHARGE:
       parameters = {
-        intensity: 0.2 + energy * 0.7 + motion * 0.1,
+        intensity: 0.12 + energy * 0.38 + amplifiedMotion * 0.5,
         videoAlpha: 0.48,
-        particleRate: 0.1 + motion * 0.7,
+        particleRate: amplifiedMotion * 0.95,
         convergence: 0.35,
         flash: 0,
         hue: 25,
@@ -79,9 +80,9 @@ export function deriveSceneParameters(state, signal) {
       break;
     case SHOW_PHASE.VORTEX:
       parameters = {
-        intensity: 0.35 + energy * 0.45 + motion * 0.2,
+        intensity: 0.18 + energy * 0.32 + amplifiedMotion * 0.5,
         videoAlpha: 0.55,
-        particleRate: 0.2 + motion * 0.8,
+        particleRate: amplifiedMotion * 0.95,
         convergence: 0,
         flash: 0,
         hue: 280,
@@ -91,7 +92,7 @@ export function deriveSceneParameters(state, signal) {
       parameters = {
         intensity: 0.3 + stillness * 0.6,
         videoAlpha: 0.35,
-        particleRate: 0.03,
+        particleRate: 0,
         convergence: stillness,
         flash: 0,
         hue: 200,
@@ -110,9 +111,9 @@ export function deriveSceneParameters(state, signal) {
     case SHOW_PHASE.READY:
     default:
       parameters = {
-        intensity: 0.08 + motion * 0.12,
+        intensity: 0.08 + amplifiedMotion * 0.12,
         videoAlpha: 0.26,
-        particleRate: 0.02 + motion * 0.05,
+        particleRate: amplifiedMotion * 0.04,
         convergence: 0,
         flash: 0,
         hue: 180,
@@ -129,6 +130,11 @@ export function deriveSceneParameters(state, signal) {
     flash: clamp01(parameters.flash),
     hue: clamp(parameters.hue, 0, 360),
   };
+}
+
+function amplifyMotion(motion) {
+  const normalized = clamp01((motion - 0.02) / 0.28);
+  return Math.sqrt(normalized);
 }
 
 function normalizeElapsed(deltaSeconds) {
