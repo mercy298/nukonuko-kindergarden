@@ -137,3 +137,223 @@ Operator button / keyboard
 - 人数・人物・姿勢の認識
 - 外部プロジェクターを使った会場リハーサル
 - GitHubへのpush、PR、release
+
+---
+
+# SHOW-RUNTIME Implementation Plan
+
+> **For agentic workers:** REQUIRED SUB-SKILL: Use `superpowers:executing-plans` to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+
+**Goal:** 運営者が5つの演目状態を確実に操作し、既存のカメラ特徴量が各場面固有の60 FPS演出へ反映される本番ランタイムを構築する。
+
+**Architecture:** ブラウザ非依存の`show-runtime.js`が状態遷移と時間ベース蓄積を所有する。`public/app.js`は運営イベントと解析信号を状態へ渡し、導出済みの場面パラメーターだけをCanvas描画へ利用する。
+
+**Tech Stack:** Vanilla JavaScript ES Modules、Node.js標準テスト、MediaDevices API、Canvas 2D
+
+## Global Constraints
+
+- 場面遷移を解析値で自動実行しない。
+- `X`は常に`CLIMAX`、`R`は常に蓄積値0の`READY`へ遷移する。
+- カメラ切断中も運営操作を受け付ける。
+- 全蓄積値は`0.0...1.0`、時間変化は`deltaSeconds`基準とする。
+- Canvasの`filter`と粒子ごとの`shadowBlur`を使用しない。
+- 映像、解析値、操作履歴を保存・外部送信しない。
+
+---
+
+### Task 1: 演目状態と時間ベース蓄積
+
+**Files:**
+- Create: `src/show-runtime.js`
+- Create: `tests/show-runtime.test.js`
+- Modify: `package.json`
+
+**Interfaces:**
+- Consumes: `{ motion: number, brightness: number, centroid: {x: number, y: number} }`と`deltaSeconds: number`
+- Produces: `SHOW_PHASE`、`createShowRuntime()`、`selectShowPhase(state, phase)`、`triggerClimax(state)`、`resetShowRuntime(state)`、`updateShowRuntime(state, signal, deltaSeconds)`、`deriveSceneParameters(state, signal)`
+
+- [ ] **Step 1: 状態遷移の失敗テストを書く**
+
+```js
+test("強制発火とリセットは現在状態に依存しない", () => {
+  const vortex = selectShowPhase(createShowRuntime(), SHOW_PHASE.VORTEX);
+  assert.equal(triggerClimax(vortex).phase, SHOW_PHASE.CLIMAX);
+  assert.deepEqual(resetShowRuntime({ ...vortex, energy: 0.8 }), {
+    phase: SHOW_PHASE.READY,
+    energy: 0,
+    stillness: 0,
+    sceneTime: 0,
+    session: 1,
+  });
+});
+```
+
+- [ ] **Step 2: Redを確認する**
+
+Run: `node --test tests/show-runtime.test.js`
+
+Expected: `SHOW_PHASE`または`createShowRuntime`が未定義でFAIL。
+
+- [ ] **Step 3: 最小の状態遷移を実装する**
+
+```js
+export const SHOW_PHASE = Object.freeze({
+  READY: "ready",
+  CHARGE: "charge",
+  VORTEX: "vortex",
+  FREEZE: "freeze",
+  CLIMAX: "climax",
+});
+
+export function createShowRuntime(session = 0) {
+  return { phase: SHOW_PHASE.READY, energy: 0, stillness: 0, sceneTime: 0, session };
+}
+```
+
+`selectShowPhase`は未知の状態を`RangeError`で拒否し、`sceneTime`だけを0へ戻す。`resetShowRuntime`は`session`を1増やした初期状態を返す。
+
+- [ ] **Step 4: 状態遷移テストのGreenを確認する**
+
+Run: `node --test tests/show-runtime.test.js`
+
+Expected: 状態遷移テストがPASS。
+
+- [ ] **Step 5: 蓄積とフレームレート不変性の失敗テストを書く**
+
+```js
+test("同じ経過時間なら解析頻度によらず蓄積値が一致する", () => {
+  const signal = { motion: 0.6, brightness: 0.2, centroid: { x: 0.5, y: 0.5 } };
+  const start = selectShowPhase(createShowRuntime(), SHOW_PHASE.CHARGE);
+  const at30 = repeatUpdate(start, signal, 1 / 30, 30);
+  const at60 = repeatUpdate(start, signal, 1 / 60, 60);
+  assert.ok(Math.abs(at30.energy - at60.energy) < 0.0001);
+});
+```
+
+`FREEZE`では`motion < 0.08`の間、静止ゲージが毎秒`0.5`増え、それ以外は毎秒`1.0`減ることもテストする。
+
+- [ ] **Step 6: 時間ベース更新と描画パラメーターを実装する**
+
+`CHARGE`のエネルギーは`(motion * 0.9 - 0.03) * deltaSeconds`、`VORTEX`は`motion * 0.25 * deltaSeconds`で増加させる。`deriveSceneParameters`は次を返す。
+
+```js
+{
+  intensity: number,
+  videoAlpha: number,
+  particleRate: number,
+  convergence: number,
+  flash: number,
+  hue: number,
+}
+```
+
+すべて有限値かつ`0.0...1.0`へ制限する。`hue`だけは`0...360`とする。
+
+- [ ] **Step 7: 全自動テストを実行する**
+
+Run: `npm test`
+
+Expected: 既存5件とSHOW-RUNTIMEテストがすべてPASS。
+
+### Task 2: 運営UIとキーボード統合
+
+**Files:**
+- Modify: `public/index.html`
+- Modify: `public/styles.css`
+- Modify: `public/app.js`
+
+**Interfaces:**
+- Consumes: Task 1の`SHOW_PHASE`と全状態操作関数
+- Produces: `[data-show-phase]`ボタン、`#showPhase`、`#energyMeter`、`#stillnessMeter`、`handleShowCommand(command)`
+
+- [ ] **Step 1: 運営コントロールをHTMLへ追加する**
+
+```html
+<section class="show-control" aria-label="演目進行">
+  <p id="showPhase">READY / 待機</p>
+  <div class="show-buttons">
+    <button data-show-phase="charge">1 CHARGE</button>
+    <button data-show-phase="vortex">2 VORTEX</button>
+    <button data-show-phase="freeze">3 FREEZE</button>
+    <button data-show-command="climax">X CLIMAX</button>
+    <button data-show-command="reset">R RESET</button>
+  </div>
+</section>
+```
+
+エネルギーと静止ゲージは既存メーターと同じ`role="meter"`契約を使う。
+
+- [ ] **Step 2: 運営イベントを状態へ接続する**
+
+`handleShowCommand`は`charge / vortex / freeze / climax / reset`を対応関数へ渡す。`reset`時は`particles = []`とし、カメラストリームは停止しない。
+
+- [ ] **Step 3: キーボードを接続する**
+
+```js
+const SHOW_KEYS = new Map([
+  ["1", "charge"], ["2", "vortex"], ["3", "freeze"],
+  ["x", "climax"], ["r", "reset"],
+]);
+```
+
+`input / select / textarea / button`へフォーカス中は無視する。全画面の`stage`へフォーカスが移っても操作できる。
+
+- [ ] **Step 4: 描画ループを時間ベース更新へ接続する**
+
+`analyzeVideoFrame`は`effectState`の更新だけを担う。`render()`で前回描画時刻との差を最大`0.1`秒へ制限し、現在の`effectState`とともに`updateShowRuntime`へ渡す。カメラの有無にかかわらず演目時間を一つの描画ループだけで更新し、解析頻度による二重更新を防ぐ。
+
+- [ ] **Step 5: UI状態を同期する**
+
+現在状態、選択ボタン、エネルギー、静止ゲージ、`stage.dataset.phase`を一つの`updateShowUi()`で更新する。`aria-pressed`と`aria-valuenow`も同時に更新する。
+
+- [ ] **Step 6: 構文検査と既存テストを実行する**
+
+Run: `npm run check && npm test`
+
+Expected: 構文検査と全テストがPASS。
+
+### Task 3: 場面別描画と受け入れ
+
+**Files:**
+- Modify: `public/app.js`
+- Modify: `public/styles.css`
+- Modify: `docs/sprints/SPRINT_SHOW_RUNTIME.md`
+- Modify: `docs/TASKS.md`
+
+**Interfaces:**
+- Consumes: Task 1の`deriveSceneParameters`、Task 2の`showRuntime`
+- Produces: READY、CHARGE、VORTEX、FREEZE、CLIMAXの視覚差、検証記録
+
+- [ ] **Step 1: 既存描画を場面パラメーターへ接続する**
+
+`drawCameraFeed`は`videoAlpha`、`spawnParticles`は`particleRate`を使う。粒子へ`mode`を持たせず、現在状態に応じて生成時の速度だけを変える。
+
+- [ ] **Step 2: 場面固有の描画を追加する**
+
+- `READY`: グリッドと薄い映像。
+- `CHARGE`: 重心を中心とする暖色リングと内向き粒子。
+- `VORTEX`: 重心周囲の円弧と接線方向の粒子。
+- `FREEZE`: 粒子を中心へ補間し、静止ゲージに応じて円を収束。
+- `CLIMAX`: 放射粒子と`Math.sin(sceneTime * 8)`による白パルス。
+
+全描画は単純図形と`screen`合成だけを使う。
+
+- [ ] **Step 3: カメラなしのヘッドレス表示を確認する**
+
+Run: `npm start`後、Chrome headlessで1440×900のスクリーンショットを取得する。
+
+Expected: 運営ボタン、READY表示、4つのメーターが見切れず表示される。
+
+- [ ] **Step 4: 自動検証を実行する**
+
+Run: `npm test && npm run check && git diff --check`
+
+Expected: 全コマンドがexit 0。
+
+- [ ] **Step 5: 実機受け入れを行う**
+
+ChromeでContinuity Cameraを開始し、`1 / 2 / 3 / X / R`、各場面の視覚差、動作中60 FPS、全画面操作を確認する。
+
+- [ ] **Step 6: 台帳を同期する**
+
+実機受け入れがすべて合格した場合だけ、`docs/TASKS.md`を`[x] / 完了 / 2026-07-18`へ更新する。未確認項目があれば`ブロック`と解除条件を記録する。
