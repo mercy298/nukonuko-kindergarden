@@ -16,8 +16,8 @@
 > **依存**: Sprint TECH-RISK-PROTOTYPE完了、GitHub CLI認証
 > **目的**: 本番前の成果物をPublic GitHubリポジトリの`master`ブランチから取得・実行できる状態にする
 > **設計書**: `docs/sprints/SPRINT_REPOSITORY_BOOTSTRAP.md`
-> **ステータス**: 進行中
+> **ステータス**: 完了
 
 | # | 完了 | タスク | 内容 | ステータス | 完了日 |
 |---:|:---:|---|---|---|---|
-| 1 | [ ] | Publicリポジトリ公開 | READMEと除外設定を整備し、公開対象を監査して、GitHubのPublicリポジトリ`mercy298/nukonuko-kindergarden`の`master`へ検証済み成果物をpushする | 進行中 | — |
+| 1 | [x] | Publicリポジトリ公開 | READMEと除外設定を整備し、公開対象を監査して、GitHubのPublicリポジトリ`mercy298/nukonuko-kindergarden`の`master`へ検証済み成果物をpushする | 完了 | 2026-07-18 |
