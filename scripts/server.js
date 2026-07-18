@@ -15,6 +15,10 @@ const routes = new Map([
   ["/styles.css", ["public/styles.css", "text/css; charset=utf-8"]],
   ["/app.js", ["public/app.js", "text/javascript; charset=utf-8"]],
   [
+    "/assets/openai-blossom-dark.svg",
+    ["public/assets/openai-blossom-dark.svg", "image/svg+xml"],
+  ],
+  [
     "/src/frame-analysis.js",
     ["src/frame-analysis.js", "text/javascript; charset=utf-8"],
   ],

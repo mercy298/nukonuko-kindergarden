@@ -12,7 +12,7 @@ import {
 
 const ANALYSIS_WIDTH = 160;
 const ANALYSIS_HEIGHT = 90;
-const MAX_PARTICLES = 520;
+const MAX_PARTICLES = 240;
 const SHOW_KEYS = new Map([
   ["1", SHOW_PHASE.CHARGE],
   ["2", SHOW_PHASE.VORTEX],
@@ -60,6 +60,9 @@ const analysisContext = elements.analysisCanvas.getContext("2d", {
   willReadFrequently: true,
 });
 const outputContext = elements.outputCanvas.getContext("2d");
+const blossomImage = new Image();
+blossomImage.decoding = "async";
+blossomImage.src = "/assets/openai-blossom-dark.svg";
 
 let activeStream = null;
 let previousFrame = null;
@@ -67,6 +70,7 @@ let effectState = createEffectState();
 let showRuntime = createShowRuntime();
 let particles = [];
 let analysisSessionId = 0;
+let lastAnalysisTime = null;
 let lastRenderTime = performance.now();
 let renderedFrames = 0;
 let fpsWindowStartedAt = performance.now();
@@ -121,6 +125,7 @@ function handleShowCommand(command) {
     showRuntime = selectShowPhase(showRuntime, command);
   } else if (command === "climax") {
     showRuntime = triggerClimax(showRuntime);
+    particles = [];
   } else if (command === "reset") {
     showRuntime = resetShowRuntime(showRuntime);
     particles = [];
@@ -219,6 +224,7 @@ async function startSelectedCamera() {
     }
 
     previousFrame = null;
+    lastAnalysisTime = null;
     effectState = createEffectState();
     elements.stage.dataset.live = "true";
     elements.stageHint.textContent = "動くほど信号が増幅します";
@@ -253,15 +259,15 @@ function scheduleAnalysis(sessionId) {
   }
 
   if ("requestVideoFrameCallback" in elements.cameraVideo) {
-    elements.cameraVideo.requestVideoFrameCallback(() =>
-      analyzeVideoFrame(sessionId),
+    elements.cameraVideo.requestVideoFrameCallback((now) =>
+      analyzeVideoFrame(sessionId, now),
     );
   } else {
-    requestAnimationFrame(() => analyzeVideoFrame(sessionId));
+    requestAnimationFrame((now) => analyzeVideoFrame(sessionId, now));
   }
 }
 
-function analyzeVideoFrame(sessionId) {
+function analyzeVideoFrame(sessionId, now) {
   if (!activeStream || sessionId !== analysisSessionId) {
     return;
   }
@@ -285,7 +291,11 @@ function analyzeVideoFrame(sessionId) {
     ANALYSIS_HEIGHT,
   );
   const analysis = analyzeFrame(previousFrame, currentFrame);
-  effectState = updateEffectState(effectState, analysis);
+  const analysisDeltaSeconds = lastAnalysisTime === null
+    ? 0
+    : Math.min(0.25, Math.max(0, (now - lastAnalysisTime) / 1000));
+  lastAnalysisTime = now;
+  effectState = updateEffectState(effectState, analysis, analysisDeltaSeconds);
   previousFrame = currentFrame;
   updateMeters(effectState);
   scheduleAnalysis(sessionId);
@@ -325,20 +335,25 @@ function render(now) {
   lastRenderTime = now;
   showRuntime = updateShowRuntime(showRuntime, effectState, deltaSeconds);
   const sceneParameters = deriveSceneParameters(showRuntime, effectState);
+  const isClimax = showRuntime.phase === SHOW_PHASE.CLIMAX;
   updateShowUi();
 
-  outputContext.fillStyle = activeStream
+  outputContext.fillStyle = isClimax
+    ? "#030405"
+    : activeStream
     ? "rgba(4, 5, 8, 0.18)"
     : "rgba(4, 5, 8, 1)";
   outputContext.fillRect(0, 0, width, height);
 
-  if (activeStream && elements.cameraVideo.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
+  if (!isClimax && activeStream && elements.cameraVideo.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
     drawCameraFeed(width, height, sceneParameters);
   }
 
   drawScene(width, height, sceneParameters);
-  spawnParticles(width, height, sceneParameters);
-  updateAndDrawParticles(width, height, deltaSeconds, sceneParameters);
+  if (!isClimax) {
+    spawnParticles(width, height, sceneParameters);
+    updateAndDrawParticles(width, height, deltaSeconds, sceneParameters);
+  }
 
   updateFps(now);
   requestAnimationFrame(render);
@@ -402,7 +417,7 @@ function drawScene(width, height, sceneParameters) {
       drawFreezeCircles(width, height, sceneParameters);
       break;
     case SHOW_PHASE.CLIMAX:
-      drawClimaxPulse(width, height, sceneParameters);
+      drawClimaxSequence(width, height);
       break;
     case SHOW_PHASE.READY:
     default:
@@ -479,20 +494,50 @@ function drawFreezeCircles(width, height, sceneParameters) {
   outputContext.restore();
 }
 
-function drawClimaxPulse(width, height, sceneParameters) {
-  const centerX = width / 2;
-  const centerY = height / 2;
-  const scale = Math.max(width, height);
+function drawClimaxSequence(width, height) {
+  const sceneTime = showRuntime.sceneTime;
+  if (sceneTime < 0.18) {
+    return;
+  }
+
+  if (sceneTime < 0.9) {
+    drawClimaxNeedles(width, height, (sceneTime - 0.18) / 0.72);
+    return;
+  }
+
+  const ignitionProgress = Math.min(1, (sceneTime - 0.9) / 0.4);
+  const easedScale = 1 - (1 - ignitionProgress) ** 3;
+  const logoScale = 0.28 + easedScale * 0.72;
 
   outputContext.save();
   outputContext.globalCompositeOperation = "screen";
-  outputContext.strokeStyle = `rgba(255, 218, 145, ${0.32 + sceneParameters.flash * 0.48})`;
-  outputContext.lineWidth = Math.max(1, scale * 0.002);
+  if (sceneTime < 1.3) {
+    outputContext.fillStyle = `rgba(255, 255, 255, ${(1 - ignitionProgress) * 0.72})`;
+    outputContext.fillRect(0, 0, width, height);
+  }
+  drawBlossom(width, height, logoScale);
+  outputContext.restore();
+}
+
+function drawClimaxNeedles(width, height, progress) {
+  const centerX = width / 2;
+  const centerY = height / 2;
+  const scale = Math.max(width, height);
+  const easedProgress = 1 - (1 - progress) ** 3;
+  const radius = scale * 0.62 * (1 - easedProgress);
+  const needleLength = scale * (0.025 + progress * 0.09);
+
+  outputContext.save();
+  outputContext.globalCompositeOperation = "screen";
+  outputContext.strokeStyle = `rgba(255, 226, 168, ${0.35 + progress * 0.65})`;
+  outputContext.lineWidth = Math.max(2, scale * 0.0035);
+  outputContext.lineCap = "round";
 
   for (let index = 0; index < 24; index += 1) {
-    const angle = (index / 24) * Math.PI * 2 + showRuntime.sceneTime * 0.18;
-    const innerRadius = scale * 0.08;
-    const outerRadius = scale * (0.32 + (index % 3) * 0.045);
+    const angle = (index / 24) * Math.PI * 2;
+    const stagger = 1 + (index % 3) * 0.08;
+    const outerRadius = radius * stagger + needleLength / 2;
+    const innerRadius = Math.max(0, radius * stagger - needleLength / 2);
     outputContext.beginPath();
     outputContext.moveTo(
       centerX + Math.cos(angle) * innerRadius,
@@ -504,16 +549,24 @@ function drawClimaxPulse(width, height, sceneParameters) {
     );
     outputContext.stroke();
   }
-
-  outputContext.fillStyle = `rgba(255, 255, 255, ${sceneParameters.flash * 0.22})`;
-  outputContext.fillRect(0, 0, width, height);
   outputContext.restore();
+}
+
+function drawBlossom(width, height, scale) {
+  if (!blossomImage.complete || blossomImage.naturalWidth === 0) {
+    return;
+  }
+
+  const size = Math.min(width, height) * 0.62 * scale;
+  const x = (width - size) / 2;
+  const y = (height - size) / 2;
+  outputContext.drawImage(blossomImage, x, y, size, size);
 }
 
 function spawnParticles(width, height, sceneParameters) {
   const spawnCount = Math.min(
-    14,
-    Math.floor(sceneParameters.particleRate * 14),
+    6,
+    Math.floor(sceneParameters.particleRate * 6),
   );
   const originX = showRuntime.phase === SHOW_PHASE.CLIMAX
     ? width / 2
@@ -627,20 +680,37 @@ function updateAndDrawParticles(width, height, deltaSeconds, sceneParameters) {
     }
 
     const alpha = Math.min(1, particle.life / particle.maximumLife);
+    const speed = Math.hypot(particle.vx, particle.vy);
+    const directionX = speed === 0 ? 0 : particle.vx / speed;
+    const directionY = speed === 0 ? 0 : particle.vy / speed;
+    const tailLength = Math.min(96, 20 + speed * 0.16);
     outputContext.beginPath();
-    outputContext.fillStyle = `rgba(255, ${120 + Math.floor(alpha * 110)}, ${65 + Math.floor(alpha * 70)}, ${alpha})`;
-    outputContext.arc(
-      particle.x,
-      particle.y,
-      particle.radius * alpha,
-      0,
-      Math.PI * 2,
+    outputContext.strokeStyle = getParticleStrokeStyle(showRuntime.phase, alpha);
+    outputContext.lineWidth = 2.5 + particle.radius * 1.4;
+    outputContext.lineCap = "round";
+    outputContext.moveTo(particle.x, particle.y);
+    outputContext.lineTo(
+      particle.x - directionX * tailLength,
+      particle.y - directionY * tailLength,
     );
-    outputContext.fill();
+    outputContext.stroke();
     return true;
   });
 
   outputContext.restore();
+}
+
+function getParticleStrokeStyle(phase, alpha) {
+  if (phase === SHOW_PHASE.CHARGE) {
+    return `rgba(255, ${Math.floor(125 + alpha * 95)}, 70, ${alpha})`;
+  }
+
+  if (phase === SHOW_PHASE.VORTEX) {
+    const hue = Math.floor(205 + alpha * 65);
+    return `hsla(${hue}, 100%, 72%, ${alpha})`;
+  }
+
+  return `rgba(150, 235, 255, ${alpha * 0.82})`;
 }
 
 function getSceneCenter(width, height) {

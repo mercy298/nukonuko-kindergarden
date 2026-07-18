@@ -101,10 +101,12 @@ export function deriveSceneParameters(state, signal) {
     case SHOW_PHASE.CLIMAX:
       parameters = {
         intensity: 1,
-        videoAlpha: 0.45,
-        particleRate: 1,
+        videoAlpha: 0,
+        particleRate: 0,
         convergence: 0,
-        flash: 0.65 + 0.35 * ((Math.sin(state.sceneTime * 8) + 1) / 2),
+        flash: state.sceneTime >= 0.9 && state.sceneTime < 1.3
+          ? 1 - (state.sceneTime - 0.9) / 0.4
+          : 0,
         hue: 45,
       };
       break;

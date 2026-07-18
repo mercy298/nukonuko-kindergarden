@@ -11,6 +11,9 @@ export function analyzeFrame(previous, current, options = {}) {
   const brightnessThreshold =
     options.brightnessThreshold ?? DEFAULT_BRIGHTNESS_THRESHOLD;
   const pixelCount = current.width * current.height;
+  const exposureOffset = previous
+    ? calculateExposureOffset(previous, current, pixelCount)
+    : { red: 0, green: 0, blue: 0 };
   let brightPixels = 0;
   let changedPixels = 0;
   let changedX = 0;
@@ -32,9 +35,9 @@ export function analyzeFrame(previous, current, options = {}) {
     }
 
     const difference =
-      (Math.abs(red - previous.data[offset]) +
-        Math.abs(green - previous.data[offset + 1]) +
-        Math.abs(blue - previous.data[offset + 2])) /
+      (Math.abs(red - previous.data[offset] - exposureOffset.red) +
+        Math.abs(green - previous.data[offset + 1] - exposureOffset.green) +
+        Math.abs(blue - previous.data[offset + 2] - exposureOffset.blue)) /
       3;
 
     if (difference < differenceThreshold) {
@@ -59,6 +62,43 @@ export function analyzeFrame(previous, current, options = {}) {
     brightRatio: brightPixels / pixelCount,
     motionCentroid,
   };
+}
+
+function calculateExposureOffset(previous, current, pixelCount) {
+  const redHistogram = new Uint32Array(511);
+  const greenHistogram = new Uint32Array(511);
+  const blueHistogram = new Uint32Array(511);
+
+  for (let pixelIndex = 0; pixelIndex < pixelCount; pixelIndex += 1) {
+    const offset = pixelIndex * 4;
+    redHistogram[current.data[offset] - previous.data[offset] + 255] += 1;
+    greenHistogram[
+      current.data[offset + 1] - previous.data[offset + 1] + 255
+    ] += 1;
+    blueHistogram[
+      current.data[offset + 2] - previous.data[offset + 2] + 255
+    ] += 1;
+  }
+
+  return {
+    red: findLowerMedianOffset(redHistogram, pixelCount),
+    green: findLowerMedianOffset(greenHistogram, pixelCount),
+    blue: findLowerMedianOffset(blueHistogram, pixelCount),
+  };
+}
+
+function findLowerMedianOffset(histogram, sampleCount) {
+  const target = Math.floor((sampleCount - 1) / 2);
+  let seen = 0;
+
+  for (let index = 0; index < histogram.length; index += 1) {
+    seen += histogram[index];
+    if (seen > target) {
+      return index - 255;
+    }
+  }
+
+  return 0;
 }
 
 function normalizeCoordinate(coordinate, dimension) {

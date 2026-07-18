@@ -120,6 +120,13 @@ select:focus-visible {
   opacity: 0.28;
 }
 
+.stage[data-phase="climax"] .stage-copy,
+.stage[data-phase="climax"] .live-indicator,
+.stage[data-phase="climax"] .stage-shade {
+  opacity: 0;
+  transition: none;
+}
+
 .eyebrow {
   margin: 0 0 12px;
   color: var(--accent);
