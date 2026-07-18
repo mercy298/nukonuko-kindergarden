@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="dark" />
+    <title>Nukonuko Signal Lab</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <section class="stage" id="stage" aria-label="カメラ反応演出プレビュー">
+        <canvas
+          id="outputCanvas"
+          role="img"
+          aria-label="カメラ映像と動きに反応する抽象演出"
+        ></canvas>
+        <div class="stage-shade" aria-hidden="true"></div>
+        <div class="stage-copy">
+          <p class="eyebrow">LIVE SIGNAL / TECH RISK 01</p>
+          <h1>NUKONUKO<br />SIGNAL LAB</h1>
+          <p id="stageHint">カメラを開始すると映像解析が動きます</p>
+        </div>
+        <div class="live-indicator" aria-hidden="true">
+          <span></span>
+          <span>CAMERA FEED</span>
+        </div>
+      </section>
+
+      <aside class="control-panel" aria-label="運営コントロール">
+        <header class="panel-header">
+          <div>
+            <p class="eyebrow">OPERATOR CONSOLE</p>
+            <h2>Input diagnostics</h2>
+          </div>
+          <p class="status" id="status" data-state="idle" aria-live="polite">
+            待機中
+          </p>
+        </header>
+
+        <section class="control-section">
+          <label for="cameraSelect">映像入力</label>
+          <div class="control-row">
+            <select id="cameraSelect" aria-describedby="cameraHelp">
+              <option value="">カメラを検索中…</option>
+            </select>
+            <button class="button button-secondary" id="refreshButton" type="button">
+              再取得
+            </button>
+          </div>
+          <p class="help" id="cameraHelp">
+            iPhoneをUSB-Cで接続し、信頼を許可してから開始してください。
+          </p>
+          <button class="button button-primary" id="startButton" type="button">
+            カメラを開始
+          </button>
+        </section>
+
+        <section class="signal-section" aria-label="解析信号">
+          <div class="meter-block">
+            <div class="meter-label">
+              <span>動き</span>
+              <output id="motionValue">0.0%</output>
+            </div>
+            <div
+              class="meter"
+              role="meter"
+              aria-label="動き量"
+              aria-valuemin="0"
+              aria-valuemax="100"
+              aria-valuenow="0"
+              id="motionMeter"
+            >
+              <span></span>
+            </div>
+          </div>
+
+          <div class="meter-block">
+            <div class="meter-label">
+              <span>高輝度</span>
+              <output id="brightnessValue">0.0%</output>
+            </div>
+            <div
+              class="meter meter-cool"
+              role="meter"
+              aria-label="高輝度領域"
+              aria-valuemin="0"
+              aria-valuemax="100"
+              aria-valuenow="0"
+              id="brightnessMeter"
+            >
+              <span></span>
+            </div>
+          </div>
+
+          <dl class="telemetry">
+            <div>
+              <dt>VIDEO</dt>
+              <dd id="videoSize">—</dd>
+            </div>
+            <div>
+              <dt>RENDER</dt>
+              <dd id="fpsValue">—</dd>
+            </div>
+          </dl>
+        </section>
+
+        <section class="action-section">
+          <button class="button button-secondary" id="fullscreenButton" type="button">
+            演出を全画面表示
+          </button>
+          <p class="error-message" id="errorMessage" role="alert" hidden></p>
+        </section>
+
+        <footer>
+          <span>LOCAL ONLY</span>
+          <span>NO RECORDING</span>
+        </footer>
+      </aside>
+    </main>
+
+    <video id="cameraVideo" playsinline muted hidden></video>
+    <canvas id="analysisCanvas" width="160" height="90" hidden></canvas>
+    <script type="module" src="/app.js"></script>
+  </body>
+</html>

@@ -1,0 +1,11 @@
+{
+  "name": "nukonuko-kindergarden",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node scripts/server.js",
+    "test": "node --test",
+    "check": "node --check src/frame-analysis.js && node --check src/effect-state.js && node --check public/app.js && node --check scripts/server.js"
+  }
+}
