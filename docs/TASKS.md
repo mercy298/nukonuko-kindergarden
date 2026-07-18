@@ -33,4 +33,4 @@
 |---:|:---:|---|---|---|---|
 | 1 | [ ] | 本番演目ランタイム | `READY / CHARGE / VORTEX / FREEZE / CLIMAX`を運営ボタンとキーから切り替え、各場面が既存の映像特徴量へ反応する。`X`の強制発火と`R`のリセットを保証し、自動テストと実機受け入れを記録する | ブロック | — |
 
-> **ブロック理由**: Task 3 Step 1〜4の実装・headless表示・自動検証は完了。Continuity Camera実機での5場面の視覚差、動作中60 FPS、全画面中の`1 / 2 / 3 / X / R`が未確認。全項目の実機合格を解除条件とする。[FACT: docs/sprints/SPRINT_SHOW_RUNTIME.md §Task 3 Step 1〜4 実装結果 → 実装済み範囲と未確認項目]
+> **ブロック理由**: 入力安定性、光跡、CLIMAXはContinuity Camera実機で暫定合格。最新変更後の動作中60 FPSと全画面中の`1 / 2 / 3 / X / R`が未確認であり、両項目の実機合格を解除条件とする。[FACT: docs/sprints/SPRINT_SHOW_RUNTIME.md §Task 3 再受け入れ不合格と入力安定化・CLIMAX再設計 → 実機合格済み範囲と未確認項目]
