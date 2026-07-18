@@ -181,11 +181,91 @@ select:focus-visible {
   color: #ff8b6c;
 }
 
+.show-control,
 .control-section,
 .signal-section,
 .action-section {
   padding: 24px 0;
   border-bottom: 1px solid var(--line);
+}
+
+.show-state {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+}
+
+.show-state output {
+  color: var(--cool);
+  font-size: 13px;
+  letter-spacing: 0.03em;
+}
+
+.show-buttons {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 5px;
+}
+
+.show-buttons button {
+  min-width: 0;
+  min-height: 38px;
+  padding: 0 3px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: rgba(255, 255, 255, 0.72);
+  background: #202229;
+  cursor: pointer;
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+.show-buttons button:hover,
+.show-buttons button[aria-pressed="true"] {
+  border-color: var(--cool);
+  color: #07110e;
+  background: var(--cool);
+}
+
+.show-buttons .show-button-climax {
+  border-color: rgba(255, 95, 54, 0.7);
+  color: #ff9b81;
+}
+
+.show-buttons .show-button-climax:hover,
+.show-buttons .show-button-climax[aria-pressed="true"] {
+  border-color: var(--accent);
+  color: #fff;
+  background: var(--accent);
+}
+
+.show-buttons kbd {
+  font: inherit;
+}
+
+.show-meters {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  margin-top: 16px;
+}
+
+.show-meters .meter-block + .meter-block {
+  margin-top: 0;
+}
+
+.show-meters .meter-label {
+  margin-bottom: 7px;
+  font-size: 10px;
 }
 
 label,

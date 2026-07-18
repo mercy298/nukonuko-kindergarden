@@ -38,6 +38,71 @@
           </p>
         </header>
 
+        <section class="show-control" aria-label="演目進行">
+          <div class="show-state">
+            <span>現在の演目</span>
+            <output id="showPhase" aria-live="polite">READY / 待機</output>
+          </div>
+          <div class="show-buttons">
+            <button type="button" data-show-phase="charge" aria-pressed="false">
+              <kbd>1</kbd> CHARGE
+            </button>
+            <button type="button" data-show-phase="vortex" aria-pressed="false">
+              <kbd>2</kbd> VORTEX
+            </button>
+            <button type="button" data-show-phase="freeze" aria-pressed="false">
+              <kbd>3</kbd> FREEZE
+            </button>
+            <button
+              class="show-button-climax"
+              type="button"
+              data-show-command="climax"
+              aria-pressed="false"
+            >
+              <kbd>X</kbd> CLIMAX
+            </button>
+            <button type="button" data-show-command="reset">
+              <kbd>R</kbd> RESET
+            </button>
+          </div>
+          <div class="show-meters">
+            <div class="meter-block">
+              <div class="meter-label">
+                <span>エネルギー</span>
+                <output id="energyValue">0.0%</output>
+              </div>
+              <div
+                class="meter"
+                role="meter"
+                aria-label="蓄積エネルギー"
+                aria-valuemin="0"
+                aria-valuemax="100"
+                aria-valuenow="0"
+                id="energyMeter"
+              >
+                <span></span>
+              </div>
+            </div>
+            <div class="meter-block">
+              <div class="meter-label">
+                <span>静止</span>
+                <output id="stillnessValue">0.0%</output>
+              </div>
+              <div
+                class="meter meter-cool"
+                role="meter"
+                aria-label="静止蓄積"
+                aria-valuemin="0"
+                aria-valuemax="100"
+                aria-valuenow="0"
+                id="stillnessMeter"
+              >
+                <span></span>
+              </div>
+            </div>
+          </div>
+        </section>
+
         <section class="control-section">
           <label for="cameraSelect">映像入力</label>
           <div class="control-row">

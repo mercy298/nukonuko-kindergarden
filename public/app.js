@@ -1,9 +1,31 @@
 import { createEffectState, updateEffectState } from "/src/effect-state.js";
 import { analyzeFrame } from "/src/frame-analysis.js";
+import {
+  SHOW_PHASE,
+  createShowRuntime,
+  resetShowRuntime,
+  selectShowPhase,
+  triggerClimax,
+  updateShowRuntime,
+} from "/src/show-runtime.js";
 
 const ANALYSIS_WIDTH = 160;
 const ANALYSIS_HEIGHT = 90;
 const MAX_PARTICLES = 520;
+const SHOW_KEYS = new Map([
+  ["1", SHOW_PHASE.CHARGE],
+  ["2", SHOW_PHASE.VORTEX],
+  ["3", SHOW_PHASE.FREEZE],
+  ["x", "climax"],
+  ["r", "reset"],
+]);
+const SHOW_LABELS = new Map([
+  [SHOW_PHASE.READY, "READY / 待機"],
+  [SHOW_PHASE.CHARGE, "CHARGE / 集合"],
+  [SHOW_PHASE.VORTEX, "VORTEX / 渦"],
+  [SHOW_PHASE.FREEZE, "FREEZE / 静止"],
+  [SHOW_PHASE.CLIMAX, "CLIMAX / 最大演出"],
+]);
 
 const elements = {
   analysisCanvas: document.querySelector("#analysisCanvas"),
@@ -11,6 +33,8 @@ const elements = {
   brightnessValue: document.querySelector("#brightnessValue"),
   cameraSelect: document.querySelector("#cameraSelect"),
   cameraVideo: document.querySelector("#cameraVideo"),
+  energyMeter: document.querySelector("#energyMeter"),
+  energyValue: document.querySelector("#energyValue"),
   errorMessage: document.querySelector("#errorMessage"),
   fpsValue: document.querySelector("#fpsValue"),
   fullscreenButton: document.querySelector("#fullscreenButton"),
@@ -18,10 +42,16 @@ const elements = {
   motionValue: document.querySelector("#motionValue"),
   outputCanvas: document.querySelector("#outputCanvas"),
   refreshButton: document.querySelector("#refreshButton"),
+  showButtons: document.querySelectorAll(
+    "[data-show-phase], [data-show-command]",
+  ),
+  showPhase: document.querySelector("#showPhase"),
   stage: document.querySelector("#stage"),
   stageHint: document.querySelector("#stageHint"),
   startButton: document.querySelector("#startButton"),
   status: document.querySelector("#status"),
+  stillnessMeter: document.querySelector("#stillnessMeter"),
+  stillnessValue: document.querySelector("#stillnessValue"),
   videoSize: document.querySelector("#videoSize"),
 };
 
@@ -33,11 +63,13 @@ const outputContext = elements.outputCanvas.getContext("2d");
 let activeStream = null;
 let previousFrame = null;
 let effectState = createEffectState();
+let showRuntime = createShowRuntime();
 let particles = [];
 let analysisSessionId = 0;
 let lastRenderTime = performance.now();
 let renderedFrames = 0;
 let fpsWindowStartedAt = performance.now();
+let renderedShowPhase = null;
 
 elements.analysisCanvas.width = ANALYSIS_WIDTH;
 elements.analysisCanvas.height = ANALYSIS_HEIGHT;
@@ -45,17 +77,63 @@ elements.analysisCanvas.height = ANALYSIS_HEIGHT;
 elements.startButton.addEventListener("click", startSelectedCamera);
 elements.refreshButton.addEventListener("click", refreshCameras);
 elements.fullscreenButton.addEventListener("click", toggleFullscreen);
+elements.showButtons.forEach((button) => {
+  button.addEventListener("click", () => {
+    handleShowCommand(button.dataset.showPhase ?? button.dataset.showCommand);
+    button.blur();
+  });
+});
 elements.cameraSelect.addEventListener("change", () => {
   if (activeStream) {
     startSelectedCamera();
   }
 });
+window.addEventListener("keydown", handleShowKeydown);
 window.addEventListener("resize", resizeOutputCanvas);
 navigator.mediaDevices?.addEventListener("devicechange", refreshCameras);
 
 resizeOutputCanvas();
+updateShowUi();
 refreshCameras();
 requestAnimationFrame(render);
+
+function handleShowKeydown(event) {
+  if (isFormControl(event.target)) {
+    return;
+  }
+
+  const command = SHOW_KEYS.get(event.key.toLowerCase());
+  if (!command) {
+    return;
+  }
+
+  event.preventDefault();
+  handleShowCommand(command);
+}
+
+function handleShowCommand(command) {
+  if (
+    command === SHOW_PHASE.CHARGE ||
+    command === SHOW_PHASE.VORTEX ||
+    command === SHOW_PHASE.FREEZE
+  ) {
+    showRuntime = selectShowPhase(showRuntime, command);
+  } else if (command === "climax") {
+    showRuntime = triggerClimax(showRuntime);
+  } else if (command === "reset") {
+    showRuntime = resetShowRuntime(showRuntime);
+    particles = [];
+  } else {
+    throw new RangeError(`未定義の演目操作です: ${command}`);
+  }
+
+  updateShowUi();
+}
+
+function isFormControl(target) {
+  return target instanceof Element &&
+    target.matches("input, select, textarea, button");
+}
 
 async function refreshCameras() {
   if (!navigator.mediaDevices?.enumerateDevices) {
@@ -239,8 +317,13 @@ function render(now) {
   resizeOutputCanvas();
   const width = elements.outputCanvas.width;
   const height = elements.outputCanvas.height;
-  const deltaSeconds = Math.min(0.05, (now - lastRenderTime) / 1000);
+  const deltaSeconds = Math.min(
+    0.1,
+    Math.max(0, (now - lastRenderTime) / 1000),
+  );
   lastRenderTime = now;
+  showRuntime = updateShowRuntime(showRuntime, effectState, deltaSeconds);
+  updateShowUi();
 
   outputContext.fillStyle = activeStream
     ? "rgba(4, 5, 8, 0.18)"
@@ -258,6 +341,36 @@ function render(now) {
 
   updateFps(now);
   requestAnimationFrame(render);
+}
+
+function updateShowUi() {
+  if (renderedShowPhase !== showRuntime.phase) {
+    elements.showPhase.value = SHOW_LABELS.get(showRuntime.phase);
+    elements.stage.dataset.phase = showRuntime.phase;
+    elements.showButtons.forEach((button) => {
+      const representedPhase =
+        button.dataset.showPhase ??
+        (button.dataset.showCommand === "climax" ? SHOW_PHASE.CLIMAX : null);
+      if (representedPhase) {
+        button.setAttribute(
+          "aria-pressed",
+          String(representedPhase === showRuntime.phase),
+        );
+      }
+    });
+    renderedShowPhase = showRuntime.phase;
+  }
+
+  updateMeter(
+    elements.energyMeter,
+    elements.energyValue,
+    showRuntime.energy * 100,
+  );
+  updateMeter(
+    elements.stillnessMeter,
+    elements.stillnessValue,
+    showRuntime.stillness * 100,
+  );
 }
 
 function drawCameraFeed(width, height) {

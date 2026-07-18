@@ -22,6 +22,10 @@ const routes = new Map([
     "/src/effect-state.js",
     ["src/effect-state.js", "text/javascript; charset=utf-8"],
   ],
+  [
+    "/src/show-runtime.js",
+    ["src/show-runtime.js", "text/javascript; charset=utf-8"],
+  ],
 ]);
 
 const server = createServer((request, response) => {

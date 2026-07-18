@@ -1,6 +1,6 @@
 # Sprint SHOW-RUNTIME: 運営者主導の本番演目ランタイム
 
-> **ステータス**: 設計レビュー中
+> **ステータス**: 実装中
 
 ## 目的
 
@@ -269,12 +269,13 @@ Expected: 既存5件とSHOW-RUNTIMEテストがすべてPASS。
 - Modify: `public/index.html`
 - Modify: `public/styles.css`
 - Modify: `public/app.js`
+- Modify: `scripts/server.js`
 
 **Interfaces:**
 - Consumes: Task 1の`SHOW_PHASE`と全状態操作関数
 - Produces: `[data-show-phase]`ボタン、`#showPhase`、`#energyMeter`、`#stillnessMeter`、`handleShowCommand(command)`
 
-- [ ] **Step 1: 運営コントロールをHTMLへ追加する**
+- [x] **Step 1: 運営コントロールをHTMLへ追加する**
 
 ```html
 <section class="show-control" aria-label="演目進行">
@@ -291,11 +292,11 @@ Expected: 既存5件とSHOW-RUNTIMEテストがすべてPASS。
 
 エネルギーと静止ゲージは既存メーターと同じ`role="meter"`契約を使う。
 
-- [ ] **Step 2: 運営イベントを状態へ接続する**
+- [x] **Step 2: 運営イベントを状態へ接続する**
 
 `handleShowCommand`は`charge / vortex / freeze / climax / reset`を対応関数へ渡す。`reset`時は`particles = []`とし、カメラストリームは停止しない。
 
-- [ ] **Step 3: キーボードを接続する**
+- [x] **Step 3: キーボードを接続する**
 
 ```js
 const SHOW_KEYS = new Map([
@@ -306,19 +307,28 @@ const SHOW_KEYS = new Map([
 
 `input / select / textarea / button`へフォーカス中は無視する。全画面の`stage`へフォーカスが移っても操作できる。
 
-- [ ] **Step 4: 描画ループを時間ベース更新へ接続する**
+- [x] **Step 4: 描画ループを時間ベース更新へ接続する**
 
 `analyzeVideoFrame`は`effectState`の更新だけを担う。`render()`で前回描画時刻との差を最大`0.1`秒へ制限し、現在の`effectState`とともに`updateShowRuntime`へ渡す。カメラの有無にかかわらず演目時間を一つの描画ループだけで更新し、解析頻度による二重更新を防ぐ。
 
-- [ ] **Step 5: UI状態を同期する**
+- [x] **Step 5: UI状態を同期する**
 
 現在状態、選択ボタン、エネルギー、静止ゲージ、`stage.dataset.phase`を一つの`updateShowUi()`で更新する。`aria-pressed`と`aria-valuenow`も同時に更新する。
 
-- [ ] **Step 6: 構文検査と既存テストを実行する**
+- [x] **Step 6: 構文検査と既存テストを実行する**
 
 Run: `npm run check && npm test`
 
 Expected: 構文検査と全テストがPASS。
+
+#### Task 2 実装結果（2026-07-18）
+
+- 5つの演目操作、現在状態、エネルギー、静止ゲージを運営パネルへ追加した。[FACT: public/index.html:41-104 → 演目ボタンと2つのmeter]
+- ボタンと`1 / 2 / 3 / X / R`を同じ操作関数へ接続し、`R`ではカメラを維持したままランタイムと粒子を初期化する。[FACT: public/app.js:77-136 → イベント登録、キー制御、handleShowCommand]
+- 演目蓄積を描画ループだけで時間更新し、状態ラベル、選択状態、ゲージのARIA属性を同期する。[FACT: public/app.js:316-374 → deltaSeconds更新とupdateShowUi]
+- ブラウザから新しいランタイムを読み込めるローカル配信ルートを追加した。[FACT: scripts/server.js:12-29 → 静的配信ルート]
+- 検証: `npm run check`、10件の`npm test`、`git diff --check`はexit 0。一時サーバーの`/`と`/src/show-runtime.js`はともにHTTP 200。
+- Task 3の場面別描画、ヘッドレス表示確認、Continuity Cameraでの実機受け入れは未着手。
 
 ### Task 3: 場面別描画と受け入れ
 
