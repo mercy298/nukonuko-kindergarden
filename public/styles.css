@@ -46,12 +46,45 @@ select:focus-visible {
 }
 
 .stage {
+  --scene-accent: var(--cool);
   position: relative;
   min-width: 0;
   overflow: hidden;
   background:
     radial-gradient(circle at 50% 45%, rgba(255, 95, 54, 0.12), transparent 36%),
     #050609;
+}
+
+.stage[data-phase="charge"] {
+  --scene-accent: #ff9b55;
+}
+
+.stage[data-phase="vortex"] {
+  --scene-accent: #d38cff;
+}
+
+.stage[data-phase="freeze"] {
+  --scene-accent: #8bdcff;
+}
+
+.stage[data-phase="climax"] {
+  --scene-accent: #fff3c4;
+}
+
+.stage[data-phase="charge"] + .control-panel {
+  --scene-accent: #ff9b55;
+}
+
+.stage[data-phase="vortex"] + .control-panel {
+  --scene-accent: #d38cff;
+}
+
+.stage[data-phase="freeze"] + .control-panel {
+  --scene-accent: #8bdcff;
+}
+
+.stage[data-phase="climax"] + .control-panel {
+  --scene-accent: #fff3c4;
 }
 
 #outputCanvas {
@@ -77,6 +110,10 @@ select:focus-visible {
   max-width: 560px;
   text-shadow: 0 2px 28px rgba(0, 0, 0, 0.85);
   transition: opacity 240ms ease;
+}
+
+.stage .stage-copy .eyebrow {
+  color: var(--scene-accent);
 }
 
 .stage[data-live="true"] .stage-copy {
@@ -202,7 +239,7 @@ select:focus-visible {
 }
 
 .show-state output {
-  color: var(--cool);
+  color: var(--scene-accent, var(--cool));
   font-size: 13px;
   letter-spacing: 0.03em;
 }

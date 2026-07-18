@@ -3,6 +3,7 @@ import { analyzeFrame } from "/src/frame-analysis.js";
 import {
   SHOW_PHASE,
   createShowRuntime,
+  deriveSceneParameters,
   resetShowRuntime,
   selectShowPhase,
   triggerClimax,
@@ -323,6 +324,7 @@ function render(now) {
   );
   lastRenderTime = now;
   showRuntime = updateShowRuntime(showRuntime, effectState, deltaSeconds);
+  const sceneParameters = deriveSceneParameters(showRuntime, effectState);
   updateShowUi();
 
   outputContext.fillStyle = activeStream
@@ -331,13 +333,12 @@ function render(now) {
   outputContext.fillRect(0, 0, width, height);
 
   if (activeStream && elements.cameraVideo.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
-    drawCameraFeed(width, height);
-    drawSignalGlow(width, height);
-    spawnParticles(width, height);
-    updateAndDrawParticles(deltaSeconds);
-  } else {
-    drawStandbyGrid(width, height, now);
+    drawCameraFeed(width, height, sceneParameters);
   }
+
+  drawScene(width, height, sceneParameters);
+  spawnParticles(width, height, sceneParameters);
+  updateAndDrawParticles(width, height, deltaSeconds, sceneParameters);
 
   updateFps(now);
   requestAnimationFrame(render);
@@ -373,7 +374,7 @@ function updateShowUi() {
   );
 }
 
-function drawCameraFeed(width, height) {
+function drawCameraFeed(width, height, sceneParameters) {
   const video = elements.cameraVideo;
   const scale = Math.max(width / video.videoWidth, height / video.videoHeight);
   const drawnWidth = video.videoWidth * scale;
@@ -384,48 +385,147 @@ function drawCameraFeed(width, height) {
   outputContext.save();
   outputContext.translate(width, 0);
   outputContext.scale(-1, 1);
-  outputContext.globalAlpha = 0.52 + effectState.motion * 0.32;
+  outputContext.globalAlpha = sceneParameters.videoAlpha;
   outputContext.drawImage(video, x, y, drawnWidth, drawnHeight);
   outputContext.restore();
 }
 
-function drawSignalGlow(width, height) {
-  const mirroredX = 1 - effectState.centroid.x;
-  const centerX = mirroredX * width;
-  const centerY = effectState.centroid.y * height;
-  const radius = Math.max(width, height) * (0.08 + effectState.motion * 0.42);
-  const glow = outputContext.createRadialGradient(
-    centerX,
-    centerY,
-    0,
-    centerX,
-    centerY,
-    radius,
-  );
-  glow.addColorStop(0, `rgba(255, 95, 54, ${Math.min(0.9, effectState.motion * 1.8)})`);
-  glow.addColorStop(0.42, `rgba(255, 180, 80, ${effectState.motion * 0.34})`);
-  glow.addColorStop(1, "rgba(255, 95, 54, 0)");
+function drawScene(width, height, sceneParameters) {
+  switch (showRuntime.phase) {
+    case SHOW_PHASE.CHARGE:
+      drawChargeRings(width, height, sceneParameters);
+      break;
+    case SHOW_PHASE.VORTEX:
+      drawVortexArcs(width, height, sceneParameters);
+      break;
+    case SHOW_PHASE.FREEZE:
+      drawFreezeCircles(width, height, sceneParameters);
+      break;
+    case SHOW_PHASE.CLIMAX:
+      drawClimaxPulse(width, height, sceneParameters);
+      break;
+    case SHOW_PHASE.READY:
+    default:
+      drawStandbyGrid(width, height, showRuntime.sceneTime * 1000);
+      break;
+  }
+}
+
+function drawChargeRings(width, height, sceneParameters) {
+  const { x, y } = getSceneCenter(width, height);
+  const scale = Math.min(width, height);
 
   outputContext.save();
   outputContext.globalCompositeOperation = "screen";
-  outputContext.fillStyle = glow;
+  outputContext.strokeStyle = `hsla(${sceneParameters.hue}, 100%, 64%, ${0.2 + sceneParameters.intensity * 0.58})`;
+  outputContext.lineWidth = Math.max(2, scale * 0.004);
+
+  for (let index = 0; index < 3; index += 1) {
+    const pulse = (Math.sin(showRuntime.sceneTime * 3 - index) + 1) * 0.018;
+    const radius = scale * (0.12 + index * 0.075 + pulse);
+    outputContext.beginPath();
+    outputContext.arc(x, y, radius, 0, Math.PI * 2);
+    outputContext.stroke();
+  }
+
+  outputContext.restore();
+}
+
+function drawVortexArcs(width, height, sceneParameters) {
+  const { x, y } = getSceneCenter(width, height);
+  const scale = Math.min(width, height);
+
+  outputContext.save();
+  outputContext.globalCompositeOperation = "screen";
+  outputContext.strokeStyle = `hsla(${sceneParameters.hue}, 92%, 70%, ${0.25 + sceneParameters.intensity * 0.6})`;
+  outputContext.lineWidth = Math.max(2, scale * 0.005);
+  outputContext.lineCap = "round";
+
+  for (let index = 0; index < 5; index += 1) {
+    const radius = scale * (0.1 + index * 0.07);
+    const start = showRuntime.sceneTime * (0.7 + index * 0.08) + index;
+    outputContext.beginPath();
+    outputContext.arc(x, y, radius, start, start + Math.PI * (0.65 + index * 0.08));
+    outputContext.stroke();
+  }
+
+  outputContext.restore();
+}
+
+function drawFreezeCircles(width, height, sceneParameters) {
+  const { x, y } = getSceneCenter(width, height);
+  const scale = Math.min(width, height);
+  const outerRadius = scale * (0.1 + (1 - sceneParameters.convergence) * 0.3);
+
+  outputContext.save();
+  outputContext.globalCompositeOperation = "screen";
+  outputContext.strokeStyle = `hsla(${sceneParameters.hue}, 95%, 78%, ${0.22 + sceneParameters.intensity * 0.62})`;
+  outputContext.lineWidth = Math.max(1.5, scale * 0.003);
+
+  for (const ratio of [1, 0.68, 0.36]) {
+    outputContext.beginPath();
+    outputContext.arc(x, y, outerRadius * ratio, 0, Math.PI * 2);
+    outputContext.stroke();
+  }
+
+  outputContext.restore();
+}
+
+function drawClimaxPulse(width, height, sceneParameters) {
+  const centerX = width / 2;
+  const centerY = height / 2;
+  const scale = Math.max(width, height);
+
+  outputContext.save();
+  outputContext.globalCompositeOperation = "screen";
+  outputContext.strokeStyle = `rgba(255, 218, 145, ${0.32 + sceneParameters.flash * 0.48})`;
+  outputContext.lineWidth = Math.max(1, scale * 0.002);
+
+  for (let index = 0; index < 24; index += 1) {
+    const angle = (index / 24) * Math.PI * 2 + showRuntime.sceneTime * 0.18;
+    const innerRadius = scale * 0.08;
+    const outerRadius = scale * (0.32 + (index % 3) * 0.045);
+    outputContext.beginPath();
+    outputContext.moveTo(
+      centerX + Math.cos(angle) * innerRadius,
+      centerY + Math.sin(angle) * innerRadius,
+    );
+    outputContext.lineTo(
+      centerX + Math.cos(angle) * outerRadius,
+      centerY + Math.sin(angle) * outerRadius,
+    );
+    outputContext.stroke();
+  }
+
+  outputContext.fillStyle = `rgba(255, 255, 255, ${sceneParameters.flash * 0.22})`;
   outputContext.fillRect(0, 0, width, height);
   outputContext.restore();
 }
 
-function spawnParticles(width, height) {
-  const spawnCount = Math.min(14, Math.floor(effectState.motion * 28));
-  const originX = (1 - effectState.centroid.x) * width;
-  const originY = effectState.centroid.y * height;
+function spawnParticles(width, height, sceneParameters) {
+  const spawnCount = Math.min(
+    14,
+    Math.floor(sceneParameters.particleRate * 14),
+  );
+  const originX = showRuntime.phase === SHOW_PHASE.CLIMAX
+    ? width / 2
+    : (1 - effectState.centroid.x) * width;
+  const originY = showRuntime.phase === SHOW_PHASE.CLIMAX
+    ? height / 2
+    : effectState.centroid.y * height;
+  const scale = Math.min(width, height);
 
   for (let index = 0; index < spawnCount; index += 1) {
     const angle = Math.random() * Math.PI * 2;
-    const speed = 45 + Math.random() * (160 + effectState.motion * 380);
+    const particle = createParticle(
+      showRuntime.phase,
+      originX,
+      originY,
+      scale,
+      angle,
+    );
     particles.push({
-      x: originX + (Math.random() - 0.5) * width * 0.16,
-      y: originY + (Math.random() - 0.5) * height * 0.2,
-      vx: Math.cos(angle) * speed,
-      vy: Math.sin(angle) * speed - 35,
+      ...particle,
       life: 0.55 + Math.random() * 0.9,
       maximumLife: 1.45,
       radius: 1.2 + Math.random() * 4.8,
@@ -437,7 +537,65 @@ function spawnParticles(width, height) {
   }
 }
 
-function updateAndDrawParticles(deltaSeconds) {
+function createParticle(phase, originX, originY, scale, angle) {
+  const variation = 0.75 + Math.random() * 0.5;
+
+  switch (phase) {
+    case SHOW_PHASE.CHARGE: {
+      const distance = scale * (0.26 + Math.random() * 0.28);
+      const speed = (90 + effectState.motion * 260) * variation;
+      return {
+        x: originX + Math.cos(angle) * distance,
+        y: originY + Math.sin(angle) * distance,
+        vx: -Math.cos(angle) * speed,
+        vy: -Math.sin(angle) * speed,
+      };
+    }
+    case SHOW_PHASE.VORTEX: {
+      const distance = scale * (0.12 + Math.random() * 0.3);
+      const speed = (120 + effectState.motion * 330) * variation;
+      return {
+        x: originX + Math.cos(angle) * distance,
+        y: originY + Math.sin(angle) * distance,
+        vx: -Math.sin(angle) * speed,
+        vy: Math.cos(angle) * speed,
+      };
+    }
+    case SHOW_PHASE.FREEZE: {
+      const distance = scale * (0.16 + Math.random() * 0.25);
+      const speed = 35 * variation;
+      return {
+        x: originX + Math.cos(angle) * distance,
+        y: originY + Math.sin(angle) * distance,
+        vx: -Math.cos(angle) * speed,
+        vy: -Math.sin(angle) * speed,
+      };
+    }
+    case SHOW_PHASE.CLIMAX: {
+      const speed = (260 + Math.random() * 480) * variation;
+      return {
+        x: originX,
+        y: originY,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
+      };
+    }
+    case SHOW_PHASE.READY:
+    default: {
+      const speed = 18 * variation;
+      return {
+        x: originX + (Math.random() - 0.5) * scale * 0.22,
+        y: originY + (Math.random() - 0.5) * scale * 0.22,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed - 8,
+      };
+    }
+  }
+}
+
+function updateAndDrawParticles(width, height, deltaSeconds, sceneParameters) {
+  const { x: centerX, y: centerY } = getSceneCenter(width, height);
+
   outputContext.save();
   outputContext.globalCompositeOperation = "screen";
 
@@ -451,6 +609,14 @@ function updateAndDrawParticles(deltaSeconds) {
     particle.y += particle.vy * deltaSeconds;
     particle.vx *= 0.985;
     particle.vy = particle.vy * 0.985 - 7 * deltaSeconds;
+
+    if (showRuntime.phase === SHOW_PHASE.FREEZE) {
+      const interpolation = sceneParameters.convergence * deltaSeconds * 3.2;
+      particle.x += (centerX - particle.x) * interpolation;
+      particle.y += (centerY - particle.y) * interpolation;
+      particle.vx *= 1 - sceneParameters.convergence * 0.08;
+      particle.vy *= 1 - sceneParameters.convergence * 0.08;
+    }
 
     const alpha = Math.min(1, particle.life / particle.maximumLife);
     outputContext.beginPath();
@@ -467,6 +633,13 @@ function updateAndDrawParticles(deltaSeconds) {
   });
 
   outputContext.restore();
+}
+
+function getSceneCenter(width, height) {
+  return {
+    x: (1 - effectState.centroid.x) * width,
+    y: effectState.centroid.y * height,
+  };
 }
 
 function drawStandbyGrid(width, height, now) {
