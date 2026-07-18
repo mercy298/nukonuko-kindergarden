@@ -527,6 +527,7 @@ async function toggleFullscreen() {
       await document.exitFullscreen();
     } else {
       await elements.stage.requestFullscreen();
+      elements.stage.focus();
     }
   } catch (error) {
     showError(`全画面表示を開始できませんでした: ${error.message}`);
