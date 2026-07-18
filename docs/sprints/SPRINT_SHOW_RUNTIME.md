@@ -172,7 +172,7 @@ Operator button / keyboard
 - Consumes: `{ motion: number, brightness: number, centroid: {x: number, y: number} }`と`deltaSeconds: number`
 - Produces: `SHOW_PHASE`、`createShowRuntime()`、`selectShowPhase(state, phase)`、`triggerClimax(state)`、`resetShowRuntime(state)`、`updateShowRuntime(state, signal, deltaSeconds)`、`deriveSceneParameters(state, signal)`
 
-- [ ] **Step 1: 状態遷移の失敗テストを書く**
+- [x] **Step 1: 状態遷移の失敗テストを書く**
 
 ```js
 test("強制発火とリセットは現在状態に依存しない", () => {
@@ -188,13 +188,13 @@ test("強制発火とリセットは現在状態に依存しない", () => {
 });
 ```
 
-- [ ] **Step 2: Redを確認する**
+- [x] **Step 2: Redを確認する**
 
 Run: `node --test tests/show-runtime.test.js`
 
 Expected: `SHOW_PHASE`または`createShowRuntime`が未定義でFAIL。
 
-- [ ] **Step 3: 最小の状態遷移を実装する**
+- [x] **Step 3: 最小の状態遷移を実装する**
 
 ```js
 export const SHOW_PHASE = Object.freeze({
@@ -212,13 +212,13 @@ export function createShowRuntime(session = 0) {
 
 `selectShowPhase`は未知の状態を`RangeError`で拒否し、`sceneTime`だけを0へ戻す。`resetShowRuntime`は`session`を1増やした初期状態を返す。
 
-- [ ] **Step 4: 状態遷移テストのGreenを確認する**
+- [x] **Step 4: 状態遷移テストのGreenを確認する**
 
 Run: `node --test tests/show-runtime.test.js`
 
 Expected: 状態遷移テストがPASS。
 
-- [ ] **Step 5: 蓄積とフレームレート不変性の失敗テストを書く**
+- [x] **Step 5: 蓄積とフレームレート不変性の失敗テストを書く**
 
 ```js
 test("同じ経過時間なら解析頻度によらず蓄積値が一致する", () => {
@@ -232,7 +232,7 @@ test("同じ経過時間なら解析頻度によらず蓄積値が一致する",
 
 `FREEZE`では`motion < 0.08`の間、静止ゲージが毎秒`0.5`増え、それ以外は毎秒`1.0`減ることもテストする。
 
-- [ ] **Step 6: 時間ベース更新と描画パラメーターを実装する**
+- [x] **Step 6: 時間ベース更新と描画パラメーターを実装する**
 
 `CHARGE`のエネルギーは`(motion * 0.9 - 0.03) * deltaSeconds`、`VORTEX`は`motion * 0.25 * deltaSeconds`で増加させる。`deriveSceneParameters`は次を返す。
 
@@ -249,11 +249,19 @@ test("同じ経過時間なら解析頻度によらず蓄積値が一致する",
 
 すべて有限値かつ`0.0...1.0`へ制限する。`hue`だけは`0...360`とする。
 
-- [ ] **Step 7: 全自動テストを実行する**
+- [x] **Step 7: 全自動テストを実行する**
 
 Run: `npm test`
 
 Expected: 既存5件とSHOW-RUNTIMEテストがすべてPASS。
+
+#### Task 1 実装結果（2026-07-18）
+
+- 5場面の状態遷移、任意状態からの強制`CLIMAX`、セッション番号つきリセットをブラウザ非依存の純粋関数として実装した。[FACT: src/show-runtime.js:1-39 → SHOW_PHASEと状態操作関数]
+- `deltaSeconds`基準のエネルギー・静止蓄積と、範囲制限済みの描画パラメーター導出を実装した。[FACT: src/show-runtime.js:41-148 → 時間ベース更新、場面パラメーター、入力制約]
+- 状態遷移、30/60 FPS相当の不変性、静止ゲージ、全場面の有限値を5テストで固定した。[FACT: tests/show-runtime.test.js:21-99 → SHOW-RUNTIMEの振る舞いテスト]
+- 検証: `node --test tests/show-runtime.test.js`は5/5、`npm test`は10/10、`npm run check`と`git diff --check`はexit 0。
+- Task 2の運営UI統合とTask 3の場面描画・実機受け入れは未着手。
 
 ### Task 2: 運営UIとキーボード統合
 

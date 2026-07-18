@@ -6,6 +6,6 @@
   "scripts": {
     "start": "node scripts/server.js",
     "test": "node --test",
-    "check": "node --check src/frame-analysis.js && node --check src/effect-state.js && node --check public/app.js && node --check scripts/server.js"
+    "check": "node --check src/frame-analysis.js && node --check src/effect-state.js && node --check src/show-runtime.js && node --check public/app.js && node --check scripts/server.js"
   }
 }
